@@ -38,7 +38,6 @@ function clearSheet(){fields.forEach(id=>{if(el[id])el[id].value='';});}
 function add(role,text){if(!text)return;state.chat.push({role,text});const labels={doctor:'👩‍⚕️ الطبيب',patient:'🧑‍🤝‍🧑 المريض',exam:'🔍 الفحص السريري',evaluation:'🎓 تقرير المدرّب السريري'};el.messages.innerHTML=state.chat.map(m=>`<div class="bubble ${m.role}"><span class="tag">${labels[m.role]}</span>${m.role==='evaluation'?`<div class="markdown">${markdown(m.text)}</div>`:escape(m.text)}</div>`).join('');el.messages.scrollTop=el.messages.scrollHeight;}
 function pick(){const list=state.filter==='all'?CASES:CASES.filter(c=>c.cat===state.filter);state.current=list[Math.floor(Math.random()*list.length)];state.chat=[];state.ended=false;state.vitals=true;state.invented={};state.lastPrompt='';el.counter.textContent=`${list.length} من ${CASES.length}`;const c=state.current;c.generatedName=names[c.sex][Math.floor(Math.random()*names[c.sex].length)];c.generatedAge=Math.floor(Math.random()*(c.ageMax-c.ageMin+1))+c.ageMin;el.avatar.textContent=c.sex==='female'?'👩':'👨';el.name.textContent=c.generatedName;el.age.textContent=`${c.generatedAge} سنة`;el.sex.textContent=c.sex==='female'?'أنثى':'ذكر';el.cat.textContent=c.cat;el.cc.textContent=c.cc;el.obWrap.classList.toggle('hidden',c.sex!=='female');clearSheet();el.answer.classList.add('hidden');el.banner.classList.add('hidden');renderExams();renderChips();add('doctor',`مرحبًا، أنا الطبيب المرافق. سأبدأ بأخذ السيرة المرضية من ${c.generatedName}. ماذا تشكو؟`);}
 
-// تم الإصلاح الجذري لدالة رسم الأزرار لمنع التكرار ومنع التشغيل التلقائي العشوائي للتقييم
 function renderExams(){
     el.exams.innerHTML = staticExams.map(([label,key],i) => `<button data-key="${key}">${i===0?'🩺 ':''}${label}</button>`).join('') + '<button data-key="special">الفحص الخاص</button>';
 }
@@ -50,10 +49,9 @@ function sheetText(){return fields.map(id=>`${id}: ${el[id]?.value||'(فارغ)'
 function buildSystemPrompt(question){return `أنت محاكي سريري بثلاثة أدوار. استخدم [كلام] أو [فحص] أو [تقييم]. [كلام] عامية عربية فقط، أجب عن كل سؤال واختر نفيًا ثابتًا للمعلومات غير الموجودة. [فحص] عربية رسمية ونتائج موضوعية بلا تشخيص. [تقييم] Markdown من خمسة أقسام، والمصطلحات الطبية والتشخيصات بالإنجليزية، مع تقييم مهني دقيق من منظور طبيب كبير. الملف السري: ${JSON.stringify(state.current)} سجل الحوار: ${JSON.stringify(state.chat)} ورقة المريض: ${sheetText()} السؤال: ${question}`;}
 function normalizeQuestion(text){return String(text||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/[ة]/g,'ه').replace(/[ى]/g,'ي').replace(/[؟?،,!.]/g,' ').replace(/\s+/g,' ').trim();}
 function spokenSnippet(text){return String(text||'').split(/[.!؟]/).filter(Boolean).slice(0,2).join('، ').replace(/بدأت الشكوى|بدأت الأعراض|^بدأ /gi,'الموضوع بدأ ').replace(/المريض|المريضة/gi,'أنا').replace(/يصف المريض الأمر بأنه|يصف أنا الأمر بأنه/gi,'أنا حاسس إن').replace(/الأعراض المرتبطة بالشكوى الرئيسية/gi,'الموضوع').replace(/يؤثر على نشاطه اليومي/gi,'مأثر على يومي').replace(/يحتاج إلى الاستفسار التفصيلي، ولا يذكر علاجًا ثابتًا آخر/gi,'عندي حاجة طبية قديمة بس محتاجة شرح أكتر').replace(/لا أعاني|لا يعاني/gi,'ما عنديش').replace(/لا يوجد|لا توجد/gi,'مفيش').replace(/لا يتناول|لا أتناول/gi,'ما باخدش').replace(/لا يدخن|لا أدخن/gi,'ما بدخنش').replace(/لا يشرب|لا أشرب/gi,'ما بشربش').replace(/ما باخدش الكحول/gi,'ما بشربش كحول').replace(/ولا يعرف حساسية دوائية/gi,'ومش عارف عندي حساسية من دواء ولا لأ').replace(/ولا يمارس الرياضة|لا يمارس الرياضة/gi,'ومش بلعب رياضة').replace(/يعمل عملًا عاديًا/gi,'بشتغل شغل عادي').replace(/يوجد/gi,'فيه').replace(/أشعر|أحس/gi,'حاسس').replace(/الجهة/gi,'الناحية').replace(/منذ/gi,'من').replace(/وتطورت/gi,'وكملت').replace(/\s{2,}/g,' ').trim();}
-function conversationalAnswer(kind,text){const value=spokenSnippet(text);const starts={chief:'والله اللي مضايقني دلوقتي إن ',history:'الموضوع بدأ ',pain:'الوجع ',associated:'أيوه، اللي حاسس بيه إن ',pmh:'عندي ',psh:'لا، ',meds:'بالنسبة للأدوية، ',family:'على حد علمي، ',social:'أنا ',obgyn:'أيوه، '};if(kind==='chief')return starts.chief+value;if(kind==='history'&&value.startsWith('الموضوع بدأ'))return value;return (starts[kind]||'بص يا دكتور، ')+value;}
 function patientNarrative(text){return spokenSnippet(String(text||'')).replace(/لا يذكر المريض معلومات إضافية من تلقاء نفسه؛ يجب طرح أسئلة محددة/gi,'مش عندي معلومات إضافية أقولها من نفسي، اسألني عن أي تفصيل محتاج تعرفه').replace(/يصف المريض الأمر بأنه يؤثر على نشاطه اليومي/gi,'حاسس إن الموضوع مأثر على نشاطي اليومي').replace(/المريض|المريضة/gi,'أنا').replace(/الموضوع بدأ الألم/gi,'بدأ الألم عندي').replace(/الموضوع بدأ قبل/gi,'بدأت المشكلة عندي قبل').replace(/بدأت الشكوى/gi,'بدأت المشكلة عندي').replace(/الأعراض المرتبطة بالشكوى الرئيسية/gi,'الأعراض اللي مرتبطة بالشكوى').replace(/لا يذكر/gi,'مش فاكر').replace(/يجب طرح أسئلة محددة/gi,'محتاج تسألني أسئلة محددة').replace(/وتطورت/gi,'وكملت').replace(/يؤثر على نشاطه اليومي/gi,'مأثر على نشاطي اليومي').replace(/أنا حاسس إن مأثر/gi,'حاسس إن الموضوع مأثر').replace(/لا توجد مضاعفات/gi,'وما حصلتش مضاعفات').replace(/لا يوجد/gi,'مفيش').replace(/لا توجد/gi,'مفيش').replace(/لا يعاني/gi,'أنا ما عنديش').replace(/لا تتناول|لا يتناول/gi,'أنا ما باخدش').replace(/لا يدخن/gi,'أنا ما بدخنش').replace(/لا يشرب/gi,'أنا ما بشربش').replace(/\s{2,}/g,' ').trim();}
 
-// دوال الفحص السريري الدقيقة
+// دوال الفحص السريري
 function caseExamResult(key) {
     const c = state.current;
     if (!c) return 'لا توجد حالة نشطة للفحص.';
@@ -105,10 +103,9 @@ function examReply(i) {
     return caseExamResult(state.lastExamKey || 'special');
 }
 
-// معالج أحداث دقيق للفحوصات السريرية
+// أزرار الفحص
 el.exams.addEventListener('click', event => {
     const button = event.target.closest('button[data-key]');
-    // منع تكرار الضغط أثناء الانشغال ومنع تفعيل التقييم التلقائي
     if (!button || state.ended || state.busy) return; 
     
     const key = button.dataset.key;
@@ -118,7 +115,6 @@ el.exams.addEventListener('click', event => {
     add('doctor', `أرغب بإجراء فحص: ${button.textContent.trim()}.`);
     add('exam', caseExamResult(key));
     
-    // تركيز الرسائل للأسفل
     el.messages.scrollTop = el.messages.scrollHeight;
 });
 
@@ -128,7 +124,6 @@ function caseSpecificCoaching(c){const key=c.cat || '';const tips={'Cardiology':
 function evaluate(){const c=state.current;const fieldsToCheck=[{id:'vitals',label:'العلامات الحيوية',reason:'مطلوبة قبل أي تشخيص أو إدارة'},{id:'sheetCc',label:'الشكاية الرئيسية',reason:'تحدد أولويات الفحص والتشخيص'},{id:'hpi',label:'تاريخ المرض الحالي (HPI)',reason:'يحدد بداية الأعراض، موضعها، شدتها، وتطورها'},{id:'pmh',label:'التاريخ المرضي السابق (PMH)',reason:'يُظهر الأمراض المزمنة والعوامل المرافقة'},{id:'psh',label:'التاريخ الجراحي (PSH)',reason:'مهم لتقييم العمليات السابقة والمضاعفات المحتملة'},{id:'fh',label:'التاريخ العائلي (FH)',reason:'مهم في بعض الحالات مثل القلب أو الوراثة أو السرطان'},{id:'meds',label:'الأدوية والحساسيات',reason:'تؤثر على التشخيص والسلامة والاختيار العلاجي'},{id:'sh',label:'التاريخ الاجتماعي',reason:'التدخين، السفر، والبيئة تؤثر على القرار السريري'},{id:'diagnosis',label:'التشخيص المبدئي',reason:'يعكس قدرة الطالب على ربط البيانات باستنتاج سريري'},{id:'head',label:'الفحص العام / الرأس والعنق',reason:'مهم في تقييم الحالة العامة ووجود علامات المرض'},{id:'abd',label:'فحص البطن',reason:'ضروري في الحالات الجراحية والطوارئ'},{id:'upper',label:'الأطراف العلوية',reason:'يؤكد الحركة، القوة، والتورم أو الألم'},{id:'lower',label:'الأطراف السفلية',reason:'يؤكد الفحص العصبي أو العظمي أو التنفسي'}];if(c.sex==='female'){fieldsToCheck.push({id:'obgyn',label:'OB/GYN',reason:'ضروري في الحالات النسائية والحمليات'});}const completed=fieldsToCheck.filter(item=>{const value=getFieldValue(item.id);return Boolean(value&&value!=='(فارغ)');});const missing=fieldsToCheck.filter(item=>!completed.some(x=>x.id===item.id)).map(item=>item.label);const score=Math.max(0,Math.min(100,Math.round((completed.length/fieldsToCheck.length)*100)));const strengthList=[];const improvementList=[];if(getFieldValue('vitals')){strengthList.push('أشيد بتوثيق العلامات الحيوية، وهي نقطة قوة أساسية تبدأ منها أي تقييم سريري صحيح.');}else{improvementList.push('أضف العلامات الحيوية فورًا: ضغط الدم، النبض، معدل التنفس، ودرجة الحرارة، لأن هذا الجزء روتيني ولا يُغفل في أي حالة.');}if(getFieldValue('hpi')){strengthList.push('تاريخ المرض الحالي واضح في معظم الحالات، وهذا يدل على أنك حاولت ربط بداية الأعراض بموقعها وشدتها وتطورها.');}else{improvementList.push('وسع HPI بذكر بداية الأعراض، موضع الألم، شدته، نوعه، ما يسببه أو يخففه، وتطوره عبر الزمن.');}if(getFieldValue('pmh')||getFieldValue('meds')){strengthList.push('ذكرت معلومات أساسية عن الأمراض المزمنة والأدوية، وهذا يساعد في تقليل الأخطاء العلاجية وتفسير الأعراض.');}else{improvementList.push('لا تنسَ الأمراض المزمنة، الأدوية، والحساسية، لأن هذه المعلومات تغيّر التحليل السريري وتؤثر على القرار العلاجي.');}if(getFieldValue('diagnosis')){strengthList.push('وجود تشخيص أولي يدل على أنك بدأت في ربط البيانات بمشكلة سريرية مميزة، وهذا علامة جيدة في التفكير التشخيصي.');}else{improvementList.push('اكتب تشخيصًا أوليًا بعد جمع التاريخ والفحص، ويفضل أن يكون واضحًا ومتماشيًا مع الأعراض المرافقة.');}if(getFieldValue('head')||getFieldValue('abd')||getFieldValue('upper')||getFieldValue('lower')){strengthList.push('الفحص السريري تم توثيقه جزئيًا، وهذه خطوة أساسية لأنها تميّز بين جمع المعلومات والتفكير التشخيصي الحقيقي.');}else{improvementList.push('أكمل الفحص السريري باحترام موقع الشكوى: الرأس والعنق، البطن، الأطراف العلوية، والأطراف السفلية، لأن الفحص يثبت أو ينفي الاحتمالات.');}const coaching=caseSpecificCoaching(c);const summaryText=score>=80?'أداء جيد ومناسب لتقييم أولي، لكنه يحتاج إلى صقل أكثر في الربط بين التاريخ والفحص والتشخيص النهائي.':score>=60?'أداء متوسط، لكنك ما زلت تحتاج إلى توثيق أكثر دقة للعرض السريري وملء الحقول الأساسية قبل إعطاء التقييم.':'أداء ضعيف في العناصر الأساسية، ويجب إعادة بناء السيرة المرضية والفحص قبل تقديم أي تشخيص أو قرار علاجي.';const resultParts=['## التقييم السريري من منظور طبيب كبير',`النتيجة الإجمالية: **${score}%**`,`الحالة الحالية: **${c.diag}** | التخصص: **${c.cat}**`,'','### ما تم بشكل جيد',strengthList.length?strengthList.map(item=>`- ${item}`).join('\n'):'- لا توجد نقاط واضحة في هذا التقييم، ويجب بناء الورقة من الأساسيات أولًا.','','### ما يحتاج إلى تحسين',missing.length?`- العناصر المفقودة: **${missing.join(', ')}**`:'- لا توجد عناصر أساسية مفقودة في ورقة المريض.',improvementList.length?improvementList.map(item=>`- ${item}`).join('\n'):'- لا توجد ملاحظات إضافية على هذا التقييم.','','### توصية الطبيب الكبير',coaching.map(item=>`- ${item}`).join('\n'),'','### الخلاصة',summaryText];return resultParts.join('\n');}
 function reveal(){const c=state.current;el.answerBody.innerHTML=`<div class="answer-block"><b>التشخيص الحقيقي</b>${escape(c.diag)}</div><div class="answer-block"><b>السيرة الحقيقية</b>${escape(c.story.hpi)}<br>${escape(c.story.pmh)}</div><div class="answer-block"><b>الفحص والعلامات الحيوية</b>${escape(formatVitals(c.exam.vitals))}<br>${escape(c.exam.head)}<br>${escape(c.exam.abd)}</div><div class="answer-block"><b>الفحوصات الخاصة</b>${escape(c.exam.extra[0].findings)}</div>`;el.answer.classList.remove('hidden');}
 
-// دالة إرسال الرسائل المعدلة بشكل آمن (لا تقييم هنا)
 async function send(){
     const q=el.input.value.trim();
     if(!q||state.busy||state.ended)return;
@@ -141,11 +136,12 @@ async function send(){
     
     await new Promise(r=>setTimeout(r,380));
     
+    // فحص إذا كان السؤال مخصصاً للفحص السريري أم للمريض
     const i=intent(q);
     if(i.vitals || i.body || i.special){
          add('exam', examReply(i));
     } else {
-         add('patient', patientReply(q));
+         add('patient', smartAnswerFromCase(q));
     }
     
     el.typing.classList.add('hidden');
@@ -187,7 +183,6 @@ set(/fracture|arthritis|ligament|osteomyelitis|osteoporosis|dislocation|carpal|o
 set(/dermatitis|psoriasis|scabies|cellulitis|lupus|melanoma|urticaria|zoster|acne|tinea|جلد|طفح|حكه/, {location:'في الجلد أو المنطقة التي يظهر فيها الطفح.',character:'الحكة أو الطفح مستمر مع فترات زيادة.',symptoms:{rash:'نعم، يوجد طفح أو تغير واضح في الجلد.',itching:'نعم، لدي حكة.',fever:/cellulitis|lupus/.test(diagnosis)?'قد توجد حرارة.':'لا توجد حرارة.',swelling:/cellulitis|urticaria/.test(diagnosis)?'يوجد تورم موضعي.':'لا يوجد تورم عميق.'}});
 if(!scenario.hpi||/الأعراض المرتبطة بالشكوى الرئيسية/.test(scenario.hpi))scenario.hpi=`${scenario.onset} ${scenario.location} ${scenario.character} ${Object.values(scenario.symptoms).slice(0,3).join(' ')}`;return scenario;}
 
-// إنشاء الحالات وتحديث التاريخ الاجتماعي للتدخين بناءً على التشخيص
 CASES.forEach(c => {
     const text = (c.diag + " " + c.cc).toLowerCase();
     if (/copd|infarction|angina|ulcer|carcinoma|thrombosis|hypertensive/.test(text)) {
@@ -198,7 +193,7 @@ CASES.forEach(c => {
     c.scenario = scenarioForCase(c);
 });
 
-// دالة الرد الشاملة والذكية للمريض
+// العقل المدبر لأسئلة المريض - تم تحسينه ليكون في منتهى الدقة والفهم
 function smartAnswerFromCase(question) {
     const q = normalizeQuestion(question).replace(/[ًٌٍَُِّْـ]/g, '');
     const c = state.current;
@@ -206,14 +201,14 @@ function smartAnswerFromCase(question) {
 
     if (!s) return "عذراً، أواجه مشكلة في تذكر حالتي الآن.";
 
-    // 1. العلامات الحيوية (إذا سأل المريض مباشرة)
+    // 1. الفحص المباشر للعلامات الحيوية كتابياً
     if (/(ضغط الدم|الضغط|النبض|حرارتك|قياس الحراره|قست حرارتك)/.test(q) && !/(هل لديك|حاسس|تشعر|عندك)/.test(q)) {
          const v = c.exam.vitals;
          return `التمريض قاسوا الحاجات دي بره.. الضغط كان ${v.bp}، والنبض ${v.hr}، والحرارة ${v.temp}، والتنفس ${v.rr}.`;
     }
 
-    // 2. الأسئلة المفتوحة (القصة من البداية)
-    if (/احكي|احك|حدثني|صف|من البدايه|من البداية|ما الذي حدث|ماذا حصل|القصة|القصه|التفاصيل/.test(q)) {
+    // 2. الأسئلة المفتوحة (القصة)
+    if (/احكي|احك|حدثني|صف لي|من البدايه|من البداية|ما الذي حدث|ماذا حصل|القصة|القصه|التفاصيل/.test(q)) {
         let story = `والله يا دكتور، الموضوع بدأ معايا بـ (${c.cc}). ${s.hpi}`;
         let positiveSymptoms = Object.values(s.symptoms).filter(Boolean).map(symp => symp.replace(/^نعم، /g, ''));
         if (positiveSymptoms.length > 0) {
@@ -226,88 +221,87 @@ function smartAnswerFromCase(question) {
         return `اللي مضايقني وجايبني المستشفى هو: ${c.cc}.`;
     }
 
-    // 3. تحليل الألم وتاريخ المرض
-    if (/متى.*(بدا|بدأ)|منذ متى|من امتى|كم له|اول مره|بشكل مفاجئ|فجأه|فجأة|تدريجي|بالضبط/.test(q)) return conversationalAnswer('history', s.onset);
-    if (/ينتشر|يمتد|يروح.*مكان|الى اين|يسمع فين/.test(q)) return conversationalAnswer('history', s.radiation);
-    if (/اين|وين|مكان|جهة|جهه|موضع|اي جزء|بإصبعك/.test(q)) return conversationalAnswer('history', s.location);
-    if (/طبيعه|نوع|كيف.*(الالم|الوجع)|صف.*(الالم|الوجع)|حارق.*أم ضاغط/.test(q)) return conversationalAnswer('history', s.character);
-    if (/ثابت|مستمر|نوبات|يروح ويجي|يجي ويروح|بيجي ويروح/.test(q)) return conversationalAnswer('history', s.course);
-    if (/شده|من عشره|من 10|كم.*من 10/.test(q)) return conversationalAnswer('history', s.severity);
-    if (/ما الذي يزيد|ماذا يزيد|بيزيد مع/.test(q)) return conversationalAnswer('history', s.aggravating);
-    if (/ما الذي يخف|ماذا يخف|يتحسن|بيقل مع|يريحك|يخففه/.test(q)) return conversationalAnswer('history', s.relieving);
-    if (/حدث هذا معك من قبل|اول مره يجيلك/.test(q)) return 'لا، دي أول مرة التعب ده يجيلي بالشكل ده.';
-
-    // 4. حالات الربو وحساسية الصدر (مستقلة تماماً عن حساسية الأدوية)
-    if (/(ربو|حساسية صدر|حساسيه صدر|ازمه صدريه)/.test(q)) {
-        return /asthma|copd|bronch/.test(c.diag.toLowerCase()) ? "أيوه يا دكتور، أنا عندي حساسية على صدري/ربو." : "لا، الحمد لله مفيش عندي ربو ولا حساسية صدر.";
-    }
-
-    // 5. التاريخ الطبي والتاريخ الجراحي والأدوية
-    if (/دواء|ادويه|أدوية|علاج|برشام|حبوب|فوار|مكملات/.test(q) && !/حساسيه|حساسية/.test(q)) {
-        return conversationalAnswer('meds', s.history.meds);
-    }
-    if (/حساسيه|حساسية|تحسس/.test(q) && !/صدر|ربو/.test(q)) {
-        return s.history.meds.includes('حساسية') ? conversationalAnswer('meds', s.history.meds) : "لا، مفيش عندي حساسية من أي أدوية أو أكل.";
-    }
-    if (/مرض مزمن|امراض مزمنه|امراض سابقه|تاريخ مرضي|ضغط|سكر|قلب|كبد|كلى/.test(q)) return conversationalAnswer('pmh', s.history.pmh);
-    
-    if (/عمليه|عمليات|جراحه|جراحة|مستشفى|مستشف|نقل دم|حجزت/.test(q)) {
-        if (/نقل دم/.test(q)) return 'لا، محتجتش نقل دم قبل كده.';
-        if (/مستشفى/.test(q)) return 'لا، مدخلتش المستشفى أو اتحجزت قبل كده قريب.';
-        return conversationalAnswer('psh', s.history.psh);
-    }
-    
-    if (/عائله|عائلة|وراثه|وراثة|اهل|أهل|والدك|والدتك/.test(q)) {
-        if (/سرطان/.test(q)) return 'لا الحمد لله مفيش تاريخ للسرطان في العيلة.';
-        if (/قلب|ضغط|سكري/.test(q)) return 'عندنا تاريخ بسيط للضغط والسكر في العيلة، بس مفيش أمراض خطيرة.';
-        return conversationalAnswer('family', s.history.fh);
-    }
-
-    // 6. التاريخ الاجتماعي والتدخين والتفاصيل الإضافية
+    // 3. التاريخ الاجتماعي (نضعها أولاً لمنع التداخل بين "طبيعة عملك" و "طبيعة الألم")
     const isSmoker = s.history.sh && s.history.sh.includes('مدخن');
     if (/كم سيجاره|كم سيجارة|كم تدخن|بتدخن قد ايه|كم علبه|كم علبة/.test(q)) {
          return isSmoker ? 'بدخن حوالي علبة لعلبتين في اليوم بقالي أكتر من 10 سنين.' : 'أنا ما بدخنش أصلاً يا دكتور.';
     }
-    if (/تدخن|شيشه|شيشة|سجائر|دخان/.test(q)) {
+    if (/تدخن|شيشه|شيشة|سجائر|دخان|سجاير/.test(q)) {
          return isSmoker ? 'أيوه يا دكتور أنا بدخن.' : 'لا، ما بدخنش ولا بستخدم الشيشة خالص.';
     }
-    if (/كحول|تشرب/.test(q)) return 'لا، مابشربش كحول أبداً.';
-    if (/وظيفه|وظيفة|عملك|مهنتك|تشتغل|شغلك/.test(q)) return 'بشتغل شغل عادي، مفيش فيه مجهود بدني شاق أو تعرض لكيماويات.';
-    if (/سفر|سافرت|خارج البلد/.test(q)) return /tuberculosis|travel/.test(c.diag.toLowerCase()) ? 'أيوه سافرت خارج البلد الفترة اللي فاتت.' : 'لا، مسافرتش خارج البلد قريب.';
-    if (/مع من تعيش|المنزل|البيت/.test(q)) return 'عايش مع أسرتي في بيت واحد.';
-    if (/نشاطك الرياضي|رياضة|رياضه|تلعب/.test(q)) return 'مفيش نشاط رياضي منتظم بصراحة، شغلي واخد وقتي.';
-    if (/شخص مريض|حيوان|مخالطة|عدوى/.test(q)) return /tuberculosis|meningitis|pneumonia|infective|viral/.test(c.diag.toLowerCase()) ? 'أيوه، كان فيه حد مريض قريب مني الفترة اللي فاتت.' : 'لا، ماتعرضتش لحد مريض أو حيوانات مؤخراً.';
+    if (/كحول|تشرب|خمور|خمره/.test(q)) return 'لا، مابشربش كحول أبداً الحمد لله.';
+    if (/وظيفه|وظيفة|عملك|مهنتك|تشتغل|شغلك|شغال ايه|طبيعة عملك|طبيعه عملك/.test(q)) return 'بشتغل شغل عادي، مفيش فيه مجهود بدني شاق أو تعرض لكيماويات.';
+    if (/سفر|سافرت|خارج البلد|بره مصر/.test(q)) return /tuberculosis|travel/.test(c.diag.toLowerCase()) ? 'أيوه سافرت خارج البلد الفترة اللي فاتت.' : 'لا، مسافرتش بره البلد قريب.';
+    if (/مع من تعيش|المنزل|البيت|ساكن مع مين/.test(q)) return 'عايش مع أسرتي في بيت واحد.';
+    if (/نشاطك الرياضي|رياضة|رياضه|تلعب|جيم/.test(q)) return 'مفيش نشاط رياضي منتظم بصراحة، شغلي واخد وقتي.';
+    if (/شخص مريض|حيوان|مخالطة|عدوى|حد تعبان/.test(q)) return /tuberculosis|meningitis|pneumonia|infective|viral/.test(c.diag.toLowerCase()) ? 'أيوه، كان فيه حد مريض قريب مني الفترة اللي فاتت.' : 'لا، ماتعرضتش لحد مريض أو حيوانات مؤخراً.';
 
-    // 7. أمراض النساء
-    if (/دوره|الدوره|حمل|ولاده|ولادة|اجهاض|إجهاض|نسائي|إفرازات|منع الحمل/.test(q)) {
-        if (c.sex === 'male') return 'يا دكتور أنا راجل، السؤال ده مش مناسب لي.';
-        if (/إفرازات/.test(q)) return /pelvic inflammatory|endometriosis|fibroid/.test(c.diag.toLowerCase()) ? 'أيوه فيه إفرازات غير طبيعية.' : 'لا مفيش إفرازات غريبة.';
-        if (/منع الحمل/.test(q)) return 'لا مش بستخدم وسيلة لمنع الحمل حالياً.';
-        return c.obgyn ? `أيوه، آخر دورة كانت ${c.obgyn.lmp}، و${c.obgyn.pregnancies}.` : 'لا، مفيش معلومات نسائية خاصة بحالتي تستدعي الذكر.';
+    // 4. تحليل الألم (HPI) بطريقة دقيقة ومباشرة
+    if (/متى.*(بدا|بدأ)|منذ متى|من امتى|كم له|اول مره|بشكل مفاجئ|فجأه|فجأة|تدريجي|بالضبط|بقالك قد ايه/.test(q)) return `بالنسبة للبداية، ${s.onset}`;
+    if (/ينتشر|يمتد|يروح.*مكان|الى اين|يسمع فين|بيسمع/.test(q)) return `بالنسبة للوجع، ${s.radiation}`;
+    if (/اين|وين|مكان|جهة|جهه|موضع|اي جزء|بإصبعك|مكان الالم|مكان الوجع/.test(q)) return `الشكوى متركزة ${s.location}`;
+    // تصحيح دقيق لسؤال طبيعة الألم
+    if (/طبيعه الالم|طبيعة الألم|طبيعه الوجع|طبيعة الوجع|نوع.*(الالم|الوجع)|كيف.*(الالم|الوجع)|صف.*(الالم|الوجع)|شكل الالم|حارق.*أم ضاغط/.test(q)) return `أقدر أوصفه إنه ${s.character}`;
+    if (/ثابت|مستمر|نوبات|يروح ويجي|يجي ويروح|بيجي ويروح|مغص/.test(q)) return `الوضع معايا ${s.course}`;
+    if (/شده|من عشره|من 10|كم.*من 10|قوة الالم|وجعك قد ايه/.test(q)) return `لو هقيمه من عشرة، أقدر أقول ${s.severity}`;
+    if (/ما الذي يزيد|ماذا يزيد|بيزيد مع|ايه بيتعبك اكتر/.test(q)) return `ألاحظ إنه ${s.aggravating}`;
+    if (/ما الذي يخف|ماذا يخف|يتحسن|بيقل مع|يريحك|يخففه|ايه بيريحك/.test(q)) return `اللي بيريحني شوية إنه ${s.relieving}`;
+    if (/حدث هذا معك من قبل|اول مره يجيلك|جاتلك قبل كده/.test(q)) return 'لا، دي أول مرة التعب ده يجيلي بالشكل ده.';
+
+    // 5. التاريخ الطبي (PMH, PSH, Meds, Allergies, FH)
+    if (/(ربو|حساسية صدر|حساسيه صدر|ازمه صدريه|بخاخات)/.test(q)) {
+        return /asthma|copd|bronch/.test(c.diag.toLowerCase()) ? "أيوه يا دكتور، أنا عندي حساسية على صدري/ربو وباخد بخاخات." : "لا، الحمد لله مفيش عندي ربو ولا حساسية صدر.";
+    }
+    if (/دواء|ادويه|أدوية|علاج|برشام|حبوب|فوار|مكملات|روشته/.test(q) && !/حساسيه|حساسية/.test(q)) {
+        return `بالنسبة للأدوية، ${s.history.meds || 'مفيش أدوية باخدها بانتظام.'}`;
+    }
+    if (/حساسيه|حساسية|تحسس|حساسيه من دواء|حساسية من اكل/.test(q) && !/صدر|ربو/.test(q)) {
+        return (s.history.meds || '').includes('حساسية') ? `عندي حساسية دوائية زي ما هو متسجل في تاريخي.` : "لا، مفيش عندي حساسية من أي أدوية أو أكل.";
+    }
+    if (/مرض مزمن|امراض مزمنه|امراض سابقه|تاريخ مرضي|ضغط|سكر|قلب|كبد|كلى/.test(q)) {
+        return `تاريخي المرضي: ${s.history.pmh || 'لا أعاني من أمراض مزمنة.'}`;
+    }
+    // فصل دقيق بين العمليات ودخول المستشفى
+    if (/عمليه|عمليات|جراحه|جراحة/.test(q)) return 'لا، الحمد لله معملتش أي عمليات جراحية قبل كده.';
+    if (/مستشفى|مستشف|تنويم|حجزت|اتحجزت|رعاية/.test(q)) return 'لا، دي أول مرة أتحجز أو أجي المستشفى بسبب التعب ده.';
+    if (/نقل دم/.test(q)) return 'لا، عمري ما نقلت دم قبل كده.';
+    
+    if (/عائله|عائلة|وراثه|وراثة|اهل|أهل|والدك|والدتك|اخواتك/.test(q)) {
+        if (/سرطان|كانسر/.test(q)) return 'لا الحمد لله مفيش تاريخ للسرطان في العيلة.';
+        if (/قلب|ضغط|سكري|سكر/.test(q)) return 'تاريخ العيلة عادي، ممكن شوية ضغط أو سكر مع كبر السن بس مفيش أمراض خطيرة.';
+        return `بالنسبة للعيلة، ${s.history.fh || 'مفيش أمراض وراثية ملحوظة.'}`;
     }
 
-    // 8. الأعراض (تغطية دقيقة لجميع الأسئلة السريعة المتاحة)
+    // 6. النساء والتوليد
+    if (/دوره|الدوره|حمل|ولاده|ولادة|اجهاض|إجهاض|نسائي|إفرازات|منع الحمل|البريود|شهريه/.test(q)) {
+        if (c.sex === 'male') return 'يا دكتور أنا راجل، السؤال ده خاص بالسيدات فقط.';
+        if (/إفرازات/.test(q)) return /pelvic inflammatory|endometriosis|fibroid/.test(c.diag.toLowerCase()) ? 'أيوه فيه إفرازات غريبة.' : 'لا مفيش إفرازات غير طبيعية.';
+        if (/منع الحمل|وسيلة|وسيله|لوب|حبوب منع/.test(q)) return 'لا مش بستخدم وسيلة لمنع الحمل حالياً.';
+        return c.obgyn ? `أيوه، آخر دورة كانت ${c.obgyn.lmp}، و${c.obgyn.pregnancies}.` : 'الحمد لله الأمور النسائية طبيعية ومفيش مشاكل.';
+    }
+
+    // 7. مراجعة الأعضاء والأعراض
     const symptomsMap = {
-        fever: /حرار|حمى|قشعر|سخون|بردان/,
-        nausea: /غثيان|نفسي غامه|لوعه|غممان|قرفان/,
-        vomiting: /قيء|استفراغ|ترجيع|براجع|زواع/,
-        diarrhea: /اسهال|إسهال/,
-        constipation: /امساك|إمساك|غازات|تبرز/,
-        dyspnea: /ضيق نفس|ضيق النفس|كحه|كحة|سعال|نهجان|نفسي قصير|مخنوق|نفسي مقطوع/,
-        wheeze: /صفير|وزيز|تزييق|صدر يصفر/,
-        palpitation: /خفقان|نبض سريع|رفرفه|دقات|قلبي يدق/,
-        sweating: /تعرق|عرق|عرقان|بعرق/,
-        dizziness: /دوخه|دوخة|اغماء|إغماء|يغمى|دوار|دايخ/,
-        rash: /طفح|حكه|حكة|هرش|بقع|احمرار جلدي/,
-        swelling: /تورم|ورم|وذمه|وذمة|منفخ|وارم/,
-        urinary: /بول|تبول|حرقان.*بول|دم.*بول|لون البول/,
-        bleeding: /براز.*اسود|دم.*براز|نزيف|نزف|لون البراز/,
-        polydipsia: /عطش|عطشان|ريق.*ناشف|بشرب مايه كتير/,
-        polyuria: /تبول.*كثير|بول.*كثير|حمام كتير/,
-        weight: /وزن|خسيت|نقص الوزن/,
-        headache: /صداع|دماغي توجع|راسي توجع/,
-        weakness: /ضعف|تنميل|شلل|مش قادر احرك|ثقل/,
-        jaundice: /اصفرار|يرقان|عيون.*صفر/
+        fever: /حرار|حمى|قشعر|سخون|بردان|سخنة|سخنه|سخن/,
+        nausea: /غثيان|نفسي غامه|لوعه|غممان|قرفان|معدتي مقلوبه/,
+        vomiting: /قيء|استفراغ|ترجيع|براجع|زواع|رجعت/,
+        diarrhea: /اسهال|إسهال|بطني سايبه/,
+        constipation: /امساك|إمساك|غازات|تبرز|حمام تقيل|انتفاخ/,
+        dyspnea: /ضيق نفس|ضيق النفس|كحه|كحة|سعال|نهجان|نفسي قصير|مخنوق|نفسي مقطوع|كرشة نفس/,
+        wheeze: /صفير|وزيز|تزييق|صدر يصفر|تكتكه في الصدر/,
+        palpitation: /خفقان|نبض سريع|رفرفه|دقات|قلبي يدق|ضربات قلب/,
+        sweating: /تعرق|عرق|عرقان|بعرق|عرق بارد/,
+        dizziness: /دوخه|دوخة|اغماء|إغماء|يغمى|دوار|دايخ|هبطان/,
+        rash: /طفح|حكه|حكة|هرش|بقع|احمرار جلدي|حساسية في الجلد/,
+        swelling: /تورم|ورم|وذمه|وذمة|منفخ|وارم|نفخه/,
+        urinary: /بول|تبول|حرقان.*بول|دم.*بول|لون البول|حمام ميه/,
+        bleeding: /براز.*اسود|دم.*براز|نزيف|نزف|لون البراز|دم مع/,
+        polydipsia: /عطش|عطشان|ريق.*ناشف|بشرب مايه كتير|ريق ناشف/,
+        polyuria: /تبول.*كثير|بول.*كثير|حمام كتير|بخش الحمام ميه كتير/,
+        weight: /وزن|خسيت|نقص الوزن|وزنك نزل/,
+        headache: /صداع|دماغي توجع|راسي توجع|وجع في الدماغ/,
+        weakness: /ضعف|تنميل|شلل|مش قادر احرك|ثقل|منمل|خدلان/,
+        jaundice: /اصفرار|يرقان|عيون.*صفر|لون جلدك اصفر/
     };
 
     for (const [key, regex] of Object.entries(symptomsMap)) {
@@ -316,14 +310,13 @@ function smartAnswerFromCase(question) {
                 let yesReply = s.symptoms[key].replace(/^نعم، /g, 'أيوه يا دكتور، ');
                 if (!yesReply.startsWith('أيوه')) yesReply = 'أيوه، ' + yesReply;
                 
-                // تفاصيل إضافية في حال سأل الطبيب "كم مرة"
-                if (/(كم مره|كم مرة|قد ايه|كام مره)/.test(q)) {
+                // تفاصيل
+                if (/(كم مره|كم مرة|قد ايه|كام مره|مرات)/.test(q)) {
                     if (key === 'vomiting') yesReply += ' (حوالي 3 أو 4 مرات من ساعة ما التعب بدأ).';
                     if (key === 'diarrhea') yesReply += ' (أكتر من 4 مرات والبراز سايل جداً).';
                 }
-                // تفاصيل إضافية عن درجة الحرارة
-                if (key === 'fever' && /(كم|كام)/.test(q)) {
-                    yesReply += ` (لما قستها كانت حوالي ${c.exam.vitals.temp}).`;
+                if (key === 'fever' && /(كم|كام|قستها)/.test(q)) {
+                    yesReply += ` (ولما قستها كانت حوالي ${c.exam.vitals.temp}).`;
                 }
                 return yesReply;
             }
@@ -332,10 +325,8 @@ function smartAnswerFromCase(question) {
         }
     }
 
-    // 9. الرد الافتراضي
-    return `بصراحة مش متأكد من النقطة دي يا دكتور، بس أنا حكيتلك كل الأعراض اللي واضحة عليا زي ما قولتلك.`;
+    // 8. الرد الافتراضي
+    return `بصراحة مش متأكد من النقطة دي يا دكتور، أنا حاولت أشرحلك كل الأعراض اللي واضحة عليا في البداية.`;
 }
-
-patientReply = smartAnswerFromCase;
 
 </script></body></html>
